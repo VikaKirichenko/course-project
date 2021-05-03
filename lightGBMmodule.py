@@ -1,15 +1,12 @@
-import os, json
 import pandas as pd
-import io
 import lightgbm as lgb
-
-
+import os, json
 
 def func(item):
     alphabet = {"а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н", "о",
                 "п", "р", "с", "т", "у", "ф", "х", "ц", "ч", "ш", "щ", "ъ", "ы", "ь", "э", "ю", "я"}
 
-    X_test = pd.DataFrame(columns=['age', 'skills', 'java', 'maven', 'git', 'sql', 'hibernate', 'spring', 'oop',
+    X_test = pd.DataFrame(columns=['age', 'skills', 'city', 'gender', 'specialty', 'java', 'maven', 'git', 'sql', 'hibernate', 'spring', 'oop',
                                    'student', 'education_level', 'total_experience', 'skill_set', 'rubbish'])
     java = False
     maven = False
@@ -20,12 +17,12 @@ def func(item):
     spring = False
     oop = False
     rubbish = False
-    if item['resume']['skills'] is not None:
+    if item['skills'] is not None:
         skills = True
     else:
         skills = False
 
-    skill_set = item['resume']['skill_set']
+    skill_set = item['skill_set']
     rubbishcount = 0
     d = {}
     for item_in in skill_set:
@@ -35,7 +32,17 @@ def func(item):
             rubbish = True
             rubbishcount += 1
             continue
-
+        tl = item['title'].lower()
+        if 'java' in tl and 'стажер' in tl:
+            specialty = 'javaintern'
+        elif 'junior' in tl and 'java' in tl:
+            specialty = 'javajun'
+        elif 'java' in tl:
+            specialty = 'javadeveloper'
+        elif 'программист' in tl or 'разработчик' in tl:
+            specialty = 'developer'
+        else:
+            specialty = 'other'
         if item_in.lower() in d:
             d[item_in.lower()] += 1
         else:
@@ -66,27 +73,33 @@ def func(item):
             oop = True
             continue
     skill_set = ",".join(skill_set)
-    if item['resume']['age'] is not None:
-        age = item['resume']['age']
+    if item['age'] is not None:
+        age = item['age']
     else:
         age = 0
+    city = item['area']['name']
+    gender = item['gender']['id']
     student = False
-    array_of_educations = item['resume']['education']['primary']
+    array_of_educations = item['education']['primary']
     for x in array_of_educations:
         if x['year'] > 2020:
             student = True
             break
-    if item['resume']['education']['level']['id'] is not None:
-        education_level = item['resume']['education']['level']['id']
+    if item['education']['level']['id'] is not None:
+        education_level = item['education']['level']['id']
     else:
         education_level = "none"
-    if item['resume']['total_experience'] is not None:
-        total_experience = item['resume']['total_experience']['months']
+    if item['total_experience'] is not None:
+        total_experience = item['total_experience']['months']
     else:
         total_experience = 0
 
-    X_test.loc[0] = [age, skills, java, maven, git, sql, hibernate, spring, oop, student,
+    X_test.loc[0] = [age, skills, city, gender, specialty, java, maven, git, sql, hibernate, spring, oop, student,
                      education_level, total_experience, skill_set, rubbishcount]
+    #city,gender,specialty,
+    X_test['city'] = pd.Series(X_test['city'], dtype="category")
+    X_test['gender'] = pd.Series(X_test['gender'], dtype="category")
+    X_test['specialty'] = pd.Series(X_test['specialty'], dtype="category")
     X_test['age'] = X_test['age'].astype(str).astype(int)
     X_test['skills'] = X_test['skills'].astype(str).astype(bool)
     X_test['java'] = X_test['java'].astype(str).astype(bool)
@@ -101,11 +114,11 @@ def func(item):
     X_test['education_level'] = pd.Series(X_test['education_level'], dtype="category")
     X_test['skill_set'] = pd.Series(X_test['skill_set'], dtype="category")
     X_test['rubbish'] = X_test['rubbish'].astype(str).astype(int)
-    bst = lgb.Booster(model_file='model.txt')
+    bst = lgb.Booster(model_file='quantile0.95model.txt')
     ypred = bst.predict(X_test)
     return ypred
 
-#input_file = open('resume.json', encoding='utf-8')
-#item = json.load(input_file)
-#print(func(item))
 
+input_file = open('resume.json', encoding='utf-8')
+item = json.load(input_file)
+print(func(item))
